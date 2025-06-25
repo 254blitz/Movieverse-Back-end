@@ -13,7 +13,7 @@ from routes.favorites import favorites_bp
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'your-secret-key')
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'd2aa1659b1406994c690554f58bc7722a2464d80c7f898c1faefa313fbfa9e02')
 app.json.compact = False
 
 db.init_app(app)
