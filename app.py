@@ -1,35 +1,46 @@
+import os
+from dotenv import load_dotenv
 from flask import Flask, request
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_restful import Api, Resource
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
-import sys
-import os
-
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from models import db, User 
 from routes.favorites import favorites_bp
 
+load_dotenv()
+
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'd2aa1659b1406994c690554f58bc7722a2464d80c7f898c1faefa313fbfa9e02')
-app.json.compact = False
+
+app.config.update(
+    SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL', 'sqlite:///app.db'),
+    SQLALCHEMY_TRACK_MODIFICATIONS=False,
+    JWT_SECRET_KEY=os.getenv('JWT_SECRET_KEY'),
+    JWT_ACCESS_TOKEN_EXPIRES=int(os.getenv('JWT_EXPIRES_MINUTES', 30)),
+    JWT_TOKEN_LOCATION=['headers', 'cookies'],
+    JWT_COOKIE_SECURE=True,
+    JWT_COOKIE_CSRF_PROTECT=True
+)
 
 db.init_app(app)
 migrate = Migrate(app, db)
 jwt = JWTManager(app)
 api = Api(app)
-CORS(app)
+CORS(app, supports_credentials=True)
+
+app.register_blueprint(favorites_bp, url_prefix='/api')
 
 class Register(Resource):
     def post(self):
         data = request.get_json()
 
-        if User.query.filter_by(username=data.get('username')).first():
+        if not data or 'username' not in data or 'email' not in data or 'password' not in data:
+            return {'message': 'Missing required fields'}, 400
+
+        if User.query.filter_by(username=data['username']).first():
             return {'message': 'Username already exists'}, 400
 
-        if User.query.filter_by(email=data.get('email')).first():
+        if User.query.filter_by(email=data['email']).first():
             return {'message': 'Email already exists'}, 400
         
         user = User(
@@ -37,37 +48,66 @@ class Register(Resource):
             email=data['email']
         )
         user.set_password(data['password'])
+        
         db.session.add(user)
-        db.session.commit()
-
-        return {'message': 'User created successfully'}, 201
+        try:
+            db.session.commit()
+            return {
+                'message': 'User created successfully',
+                'user_id': user.id
+            }, 201
+        except Exception as e:
+            db.session.rollback()
+            return {'message': str(e)}, 500
 
 class Login(Resource):
     def post(self):
         data = request.get_json()
-        user = User.query.filter_by(username=data.get('username')).first()
+        
+        if not data or 'username' not in data or 'password' not in data:
+            return {'message': 'Missing credentials'}, 400
 
-        if not user or not user.check_password(data.get('password')):
+        user = User.query.filter_by(username=data['username']).first()
+
+        if not user or not user.check_password(data['password']):
             return {'message': 'Invalid username or password'}, 401
         
-        return {'access_token': user.generate_token()}, 200
+        return {
+            'access_token': user.generate_token(),
+            'user_id': user.id
+        }, 200
 
 class Profile(Resource):
     @jwt_required()
     def get(self):
         user = User.query.get(get_jwt_identity())
+        if not user:
+            return {'message': 'User not found'}, 404
+            
         return {
             'id': user.id,
             'username': user.username,
             'email': user.email,
-            'created_at': user.created_at.isoformat()
+            'member_since': user.created_at.strftime('%B %d, %Y')
         }, 200
 
-api.add_resource(Register, '/register')
-api.add_resource(Login, '/login')
-api.add_resource(Profile, '/profile')
+api.add_resource(Register, '/auth/register')
+api.add_resource(Login, '/auth/login')
+api.add_resource(Profile, '/auth/profile')
+
+@app.errorhandler(404)
+def not_found(e):
+    return {'message': 'Resource not found'}, 404
+
+@app.errorhandler(500)
+def server_error(e):
+    return {'message': 'Internal server error'}, 500
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    app.run(
+        host=os.getenv('FLASK_HOST', '0.0.0.0'),
+        port=int(os.getenv('FLASK_PORT', 5000)),
+        debug=os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+    )
