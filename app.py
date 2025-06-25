@@ -6,6 +6,7 @@ from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 import sys
 import os
 
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from models import db, User 
 from routes.favorites import favorites_bp
