@@ -3,8 +3,12 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_restful import Api, Resource
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
+import sys
 import os
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from models import db, User 
+from routes.favorites import favorites_bp
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
