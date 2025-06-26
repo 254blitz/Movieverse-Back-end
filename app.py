@@ -1,19 +1,12 @@
 import os
+from models import db, User  
+from flask import Flask, request 
 from dotenv import load_dotenv
-from flask import Flask, request
+from flask import Flask
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_restful import Api, Resource
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
-
-import sys
-import os
-
-
-
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from models import db, User 
-from routes.favorites import favorites_bp
 
 load_dotenv()
 
@@ -35,13 +28,15 @@ jwt = JWTManager(app)
 api = Api(app)
 CORS(app, supports_credentials=True)
 
-app.register_blueprint(favorites_bp, url_prefix='/api')
+from routes.favorites import favorites_bp
+app.register_blueprint(favorites_bp) 
 
 class Register(Resource):
     def post(self):
         data = request.get_json()
 
-        if not data or 'username' not in data or 'email' not in data or 'password' not in data:
+        required_fields = ['username', 'email', 'password']
+        if not all(field in data for field in required_fields):
             return {'message': 'Missing required fields'}, 400
 
         if User.query.filter_by(username=data['username']).first():
@@ -50,28 +45,28 @@ class Register(Resource):
         if User.query.filter_by(email=data['email']).first():
             return {'message': 'Email already exists'}, 400
         
-        user = User(
-            username=data['username'],
-            email=data['email']
-        )
-        user.set_password(data['password'])
-        
-        db.session.add(user)
         try:
+            user = User(
+                username=data['username'],
+                email=data['email']
+            )
+            user.set_password(data['password'])
+            db.session.add(user)
             db.session.commit()
+            
             return {
                 'message': 'User created successfully',
                 'user_id': user.id
             }, 201
         except Exception as e:
             db.session.rollback()
-            return {'message': str(e)}, 500
+            return {'message': 'Failed to create user'}, 500
 
 class Login(Resource):
     def post(self):
         data = request.get_json()
         
-        if not data or 'username' not in data or 'password' not in data:
+        if not all(field in data for field in ['username', 'password']):
             return {'message': 'Missing credentials'}, 400
 
         user = User.query.filter_by(username=data['username']).first()
