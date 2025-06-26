@@ -11,25 +11,22 @@ def add_favorite():
     """Add a movie to user's favorites"""
     data = request.get_json()
     
-    # Validate required fields
     if not data or not data.get('imdb_id') or not data.get('title'):
         return jsonify({'error': 'Missing imdb_id or title'}), 400
 
     current_user_id = get_jwt_identity()
 
-    # Check for duplicate favorite
     if Favorite.query.filter_by(
         user_id=current_user_id,
         movie_id=data['imdb_id']
     ).first():
         return jsonify({'error': 'Movie already in favorites'}), 409
 
-    # Create new favorite
     new_fav = Favorite(
         user_id=current_user_id,
         movie_id=data['imdb_id'],
         title=data['title'],
-        poster_url=data.get('poster_url')  # Optional field
+        poster_url=data.get('poster_url')  
     )
     
     db.session.add(new_fav)

@@ -1,12 +1,11 @@
 import os
-from models import db, User  
-from flask import Flask, request 
+from flask import Flask, request
 from dotenv import load_dotenv
-from flask import Flask
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_restful import Api, Resource
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
+from models import db, User
 
 load_dotenv()
 
@@ -29,7 +28,7 @@ api = Api(app)
 CORS(app, supports_credentials=True)
 
 from routes.favorites import favorites_bp
-app.register_blueprint(favorites_bp) 
+app.register_blueprint(favorites_bp, url_prefix='/api')
 
 class Register(Resource):
     def post(self):
@@ -41,7 +40,6 @@ class Register(Resource):
 
         if User.query.filter_by(username=data['username']).first():
             return {'message': 'Username already exists'}, 400
-
         if User.query.filter_by(email=data['email']).first():
             return {'message': 'Email already exists'}, 400
         
@@ -56,7 +54,8 @@ class Register(Resource):
             
             return {
                 'message': 'User created successfully',
-                'user_id': user.id
+                'user_id': user.id,
+                'username': user.username
             }, 201
         except Exception as e:
             db.session.rollback()
@@ -76,7 +75,8 @@ class Login(Resource):
         
         return {
             'access_token': user.generate_token(),
-            'user_id': user.id
+            'user_id': user.id,
+            'username': user.username
         }, 200
 
 class Profile(Resource):

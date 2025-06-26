@@ -29,7 +29,6 @@ def search_movies():
     user_favorites = Favorite.query.filter_by(user_id=current_user_id).all()
     favorited_ids = {fav.movie_id for fav in user_favorites}
 
-    # Add is_favorite flag to each movie
     for movie in movies_data['Search']:
         movie['is_favorite'] = movie.get('imdbID') in favorited_ids
 
