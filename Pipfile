@@ -12,6 +12,7 @@ flask-jwt-extended = "*"
 flask = "*"
 cors = "*"
 flask-cors = "*"
+python-dotenv = "*"
 
 [requires]
 python_full_version = "3.8.10"
