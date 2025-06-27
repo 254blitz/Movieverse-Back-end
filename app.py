@@ -17,13 +17,17 @@ load_dotenv()
 
 app = Flask(__name__)
 
+database_url = os.getenv('DATABASE_URL')
+if database_url and database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
 app.config.update(
-    SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL', 'sqlite:///app.db'),
+    SQLALCHEMY_DATABASE_URI=database_url or 'sqlite:///app.db',
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     JWT_SECRET_KEY=os.getenv('JWT_SECRET_KEY', 'your-secret-key-here'),
     JWT_ACCESS_TOKEN_EXPIRES=timedelta(minutes=int(os.getenv('JWT_EXPIRES_MINUTES', 30))),
     JWT_TOKEN_LOCATION=['headers', 'cookies'],
-    JWT_COOKIE_SECURE=True,
+    JWT_COOKIE_SECURE=os.getenv('FLASK_ENV', 'production') == 'production',
     JWT_COOKIE_CSRF_PROTECT=True
 )
 
@@ -126,6 +130,6 @@ if __name__ == '__main__':
         db.create_all()
     app.run(
         host=os.getenv('FLASK_HOST', '0.0.0.0'),
-        port=int(os.getenv('FLASK_PORT', 5000)),
+        port=int(os.getenv('PORT', os.getenv('FLASK_PORT', 5000))), 
         debug=os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     )

@@ -1,1 +1,6 @@
-gunicorn -w 1 --bind 0.0.0.0:${PORT:-10000} app:app
+set -o errexit
+set -o pipefail
+set -o nounset
+
+python -m flask db upgrade
+gunicorn --bind 0.0.0.0:$PORT app:app
