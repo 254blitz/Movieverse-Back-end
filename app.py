@@ -4,7 +4,8 @@ from flask_migrate import Migrate
 from flask_restful import Api, Resource
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 import os
-from models import db, User 
+
+from models import db, User
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
@@ -12,11 +13,13 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'your-secret-key')
 app.json.compact = False
 
+
 db.init_app(app)
 migrate = Migrate(app, db)
 jwt = JWTManager(app)
-api = Api(app)
-CORS(app)
+CORS(app, supports_credentials=True)
+
+api = Api(app, prefix="/api")
 
 class Register(Resource):
     def post(self):
@@ -27,7 +30,7 @@ class Register(Resource):
 
         if User.query.filter_by(email=data.get('email')).first():
             return {'message': 'Email already exists'}, 400
-        
+
         user = User(
             username=data['username'],
             email=data['email']
@@ -45,7 +48,7 @@ class Login(Resource):
 
         if not user or not user.check_password(data.get('password')):
             return {'message': 'Invalid username or password'}, 401
-        
+
         return {'access_token': user.generate_token()}, 200
 
 class Profile(Resource):
