@@ -1,14 +1,19 @@
 import os
 from flask import Flask, jsonify
+from flask_sqlalchemy import SQLAlchemy 
 from dotenv import load_dotenv
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_restful import Api
 from flask_jwt_extended import JWTManager
 from datetime import timedelta
-from models import db, User
 import logging
 from logging.handlers import RotatingFileHandler
+
+db = SQLAlchemy()  
+migrate = Migrate()
+jwt = JWTManager()
+api = Api()
 
 load_dotenv()
 
@@ -36,45 +41,47 @@ def create_app():
         JWT_SECRET_KEY=os.getenv('JWT_SECRET_KEY', 'fallback-secret-key'),
         JWT_ACCESS_TOKEN_EXPIRES=timedelta(minutes=30),
         JWT_REFRESH_TOKEN_EXPIRES=timedelta(days=7),
-        JWT_TOKEN_LOCATION=['headers']
+        JWT_TOKEN_LOCATION=['headers'],
+        JWT_COOKIE_SECURE=True,
+        JWT_COOKIE_CSRF_PROTECT=True
     )
 
     db.init_app(app)
-    Migrate(app, db)
-    JWTManager(app)
+    migrate.init_app(app, db)
+    jwt.init_app(app)
     
     cors = CORS(app,
-    supports_credentials=True,
-    resources={
-        r"/api/*": {
-            "origins": [
-                "http://localhost:3000",
-                "https://movieverse-frontend-8n88.onrender.com"
-            ],
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"],
-            "expose_headers": ["Content-Type"],
-            "max_age": 600  
-        },
-        r"/auth/*": {  
-            "origins": [
-                "http://localhost:3000",
-                "https://movieverse-frontend-8n88.onrender.com"
-            ],
-            "methods": ["POST", "OPTIONS"],
-            "allow_headers": ["Content-Type"],
-            "supports_credentials": True
+        supports_credentials=True,
+        resources={
+            r"/api/*": {
+                "origins": [
+                    "http://localhost:3000",
+                    "https://movieverse-frontend-8n88.onrender.com"
+                ],
+                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                "allow_headers": ["Content-Type", "Authorization"],
+                "expose_headers": ["Content-Type"],
+                "max_age": 600  
+            },
+            r"/auth/*": {  
+                "origins": [
+                    "http://localhost:3000",
+                    "https://movieverse-frontend-8n88.onrender.com"
+                ],
+                "methods": ["POST", "OPTIONS"],
+                "allow_headers": ["Content-Type"],
+                "supports_credentials": True
+            }
         }
-    }
-)
+    )
 
     register_routes(app)
-
     setup_logging(app)
 
     @app.cli.command('init-db')
     def init_db():
         """Initialize database with test data"""
+        from models import User
         with app.app_context():
             db.create_all()
             if not User.query.filter_by(username="testuser").first():
@@ -113,8 +120,8 @@ def register_routes(app):
     app.register_blueprint(omdb_bp, url_prefix='/api')
     app.register_blueprint(favorites_bp, url_prefix='/api')
     
-    api = Api(app)
     register_resources(api)
+    api.init_app(app)
 
 app = create_app()
 
