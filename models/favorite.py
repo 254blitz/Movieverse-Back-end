@@ -1,14 +1,83 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
-from sqlalchemy.orm import relationship
-from . import db
+from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from models import db
+from models.favorite import Favorite
 
-class Favorite(db.Model):
-    __tablename__ = 'favorites'
+favorites_bp = Blueprint('favorites', __name__)
 
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    movie_id = db.Column(db.String, nullable=False)
-    title = db.Column(db.String, nullable=False)
-    poster_url = db.Column(db.String)
+@favorites_bp.route('/favorites', methods=['POST'])
+@jwt_required()
+def add_favorite():
+    """Add a movie to user's favorites"""
+    data = request.get_json()
+    
+    if not data or not data.get('imdb_id') or not data.get('title'):
+        return jsonify({'error': 'Missing imdb_id or title'}), 400
 
-    user = db.relationship('User', back_populates='favorites')
+    current_user_id = get_jwt_identity()
+
+    if Favorite.query.filter_by(
+        user_id=current_user_id,
+        movie_id=data['imdb_id']
+    ).first():
+        return jsonify({'error': 'Movie already in favorites'}), 409
+
+    try:
+        new_fav = Favorite(
+            user_id=current_user_id,
+            movie_id=data['imdb_id'],
+            title=data['title'],
+            poster_url=data.get('poster_url')  
+        )
+        
+        db.session.add(new_fav)
+        db.session.commit()
+
+        return jsonify({
+            'id': new_fav.id,
+            'movie_id': new_fav.movie_id,
+            'title': new_fav.title,
+            'poster_url': new_fav.poster_url
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to add favorite'}), 500
+
+@favorites_bp.route('/favorites', methods=['GET'])
+@jwt_required()
+def get_favorites():
+    """Get all favorites for current user"""
+    try:
+        favorites = Favorite.query.filter_by(
+            user_id=get_jwt_identity()
+        ).all()
+
+        return jsonify([{
+            'id': fav.id,
+            'movie_id': fav.movie_id,
+            'title': fav.title,
+            'poster_url': fav.poster_url
+        } for fav in favorites]), 200
+    except Exception as e:
+        return jsonify({'error': 'Failed to get favorites'}), 500
+
+@favorites_bp.route('/favorites/<string:imdb_id>', methods=['DELETE'])
+@jwt_required()
+def remove_favorite(imdb_id):
+    """Remove a movie from favorites"""
+    try:
+        fav = Favorite.query.filter_by(
+            user_id=get_jwt_identity(),
+            movie_id=imdb_id
+        ).first()
+
+        if not fav:
+            return jsonify({'error': 'Favorite not found'}), 404
+
+        db.session.delete(fav)
+        db.session.commit()
+
+        return jsonify({'message': 'Favorite removed'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to remove favorite'}), 500

@@ -43,13 +43,30 @@ def create_app():
     Migrate(app, db)
     JWTManager(app)
     
-    CORS(app, resources={
+    cors = CORS(app,
+    supports_credentials=True,
+    resources={
         r"/api/*": {
-            "origins": os.getenv('FRONTEND_URL', 'http://localhost:3000'),
+            "origins": [
+                "http://localhost:3000",
+                "https://movieverse-frontend-8n88.onrender.com"
+            ],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
+            "allow_headers": ["Content-Type", "Authorization"],
+            "expose_headers": ["Content-Type"],
+            "max_age": 600  
+        },
+        r"/auth/*": {  
+            "origins": [
+                "http://localhost:3000",
+                "https://movieverse-frontend-8n88.onrender.com"
+            ],
+            "methods": ["POST", "OPTIONS"],
+            "allow_headers": ["Content-Type"],
+            "supports_credentials": True
         }
-    })
+    }
+)
 
     register_routes(app)
 
