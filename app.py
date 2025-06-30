@@ -1,6 +1,6 @@
 import os
 from flask import Flask, jsonify
-from flask_sqlalchemy import SQLAlchemy 
+from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 from flask_cors import CORS
 from flask_migrate import Migrate
@@ -10,7 +10,7 @@ from datetime import timedelta
 import logging
 from logging.handlers import RotatingFileHandler
 
-db = SQLAlchemy()  
+db = SQLAlchemy()
 migrate = Migrate()
 jwt = JWTManager()
 api = Api()
@@ -20,7 +20,7 @@ load_dotenv()
 def setup_logging(app):
     """Configure application logging"""
     if not os.path.exists('logs'):
-        os.mkdir('logs')
+        os.makedirs('logs')
     handler = RotatingFileHandler('logs/movieverse.log', maxBytes=10000, backupCount=3)
     handler.setFormatter(logging.Formatter(
         '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
@@ -31,49 +31,36 @@ def setup_logging(app):
 def create_app():
     app = Flask(__name__)
     
-    db_url = os.getenv('DATABASE_URL', 'sqlite:///app.db')
-    if db_url.startswith('postgres://'):
-        db_url = db_url.replace('postgres://', 'postgresql://', 1)
+    db_url = os.getenv('DATABASE_URL', 'sqlite:///instance/app.db')
+    os.makedirs('instance', exist_ok=True)  
     
     app.config.update(
         SQLALCHEMY_DATABASE_URI=db_url,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
-        JWT_SECRET_KEY=os.getenv('JWT_SECRET_KEY', 'fallback-secret-key'),
+        JWT_SECRET_KEY=os.getenv('JWT_SECRET_KEY'),
         JWT_ACCESS_TOKEN_EXPIRES=timedelta(minutes=30),
         JWT_REFRESH_TOKEN_EXPIRES=timedelta(days=7),
         JWT_TOKEN_LOCATION=['headers'],
-        JWT_COOKIE_SECURE=True,
+        JWT_COOKIE_SECURE=os.getenv('FLASK_ENV') == 'production',
         JWT_COOKIE_CSRF_PROTECT=True
     )
+
+    if not app.config['JWT_SECRET_KEY']:
+        raise RuntimeError("JWT_SECRET_KEY must be set")
 
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
     
-    cors = CORS(app,
-        supports_credentials=True,
-        resources={
-            r"/api/*": {
-                "origins": [
-                    "http://localhost:3000",
-                    "https://movieverse-frontend-8n88.onrender.com"
-                ],
-                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                "allow_headers": ["Content-Type", "Authorization"],
-                "expose_headers": ["Content-Type"],
-                "max_age": 600  
-            },
-            r"/auth/*": {  
-                "origins": [
-                    "http://localhost:3000",
-                    "https://movieverse-frontend-8n88.onrender.com"
-                ],
-                "methods": ["POST", "OPTIONS"],
-                "allow_headers": ["Content-Type"],
-                "supports_credentials": True
-            }
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": [
+                "http://localhost:3000",
+                "https://movieverse-frontend-8n88.onrender.com"
+            ],
+            "supports_credentials": True
         }
-    )
+    })
 
     register_routes(app)
     setup_logging(app)
@@ -81,7 +68,7 @@ def create_app():
     @app.cli.command('init-db')
     def init_db():
         """Initialize database with test data"""
-        from models import User
+        from models.user import User
         with app.app_context():
             db.create_all()
             if not User.query.filter_by(username="testuser").first():
