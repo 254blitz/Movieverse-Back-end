@@ -3,9 +3,9 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db
 from models.favorite import Favorite
 
-favorites_bp = Blueprint('favorites', __name__, url_prefix='/api/favorites')
+favorites_bp = Blueprint('favorites', __name__)
 
-@favorites_bp.route('', methods=['POST'])
+@favorites_bp.route('/favorites', methods=['POST'])
 @jwt_required()
 def add_favorite():
     """Add a movie to user's favorites"""
@@ -39,7 +39,7 @@ def add_favorite():
         'poster_url': new_fav.poster_url
     }), 201
 
-@favorites_bp.route('', methods=['GET'])
+@favorites_bp.route('/favorites', methods=['GET'])
 @jwt_required()
 def get_favorites():
     """Get all favorites for current user"""
@@ -54,7 +54,7 @@ def get_favorites():
         'poster_url': fav.poster_url
     } for fav in favorites]), 200
 
-@favorites_bp.route('/<string:imdb_id>', methods=['DELETE'])
+@favorites_bp.route('/favorites/<string:imdb_id>', methods=['DELETE'])
 @jwt_required()
 def remove_favorite(imdb_id):
     """Remove a movie from favorites"""

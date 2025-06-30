@@ -2,7 +2,7 @@ from . import db
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token
 from datetime import datetime, timezone
-
+    
 class User(db.Model):
     __tablename__ = 'users'
 
